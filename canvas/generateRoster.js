@@ -48,7 +48,7 @@ export async function generateRosterCanvas(rosterData) {
   ctx.fillStyle = "#a2C6Ca";
   ctx.font = "bold 120px 'Times New Roman'";
   ctx.textAlign = "center";
-  ctx.fillText("RAV ORGANIZATIONAL CHART", width / 2, 160);
+  ctx.fillText("RAV ROSTER", width / 2, 160);
 
   // Subtitle
   ctx.font = "52px 'Times New Roman'";
@@ -56,7 +56,7 @@ export async function generateRosterCanvas(rosterData) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-GB");
   const timeStr = now.toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' });
-  ctx.fillText(`Active Personnel: ${totalMembers} | Updated: ${dateStr} ${timeStr}`, width / 2, 230);
+  ctx.fillText(`Active members: ${totalMembers} | Updated: ${dateStr} ${timeStr}`, width / 2, 230);
 
   // Divider line
   ctx.strokeStyle = "rgba(255,255,255,0.2)";
