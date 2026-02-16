@@ -63,7 +63,7 @@ export async function generateRosterCanvas(rosterData) {
     const logo = await loadImage('./assets/rav_logo.png');
     const logoSize = 450; // Bigger logo
     const logoX = width - logoSize - 100;
-    const logoY = 80; // Lower position
+    const logoY = 150; // Lower position
     
     ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
   } catch (err) {
