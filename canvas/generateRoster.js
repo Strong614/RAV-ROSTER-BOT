@@ -46,7 +46,7 @@ export async function generateRosterCanvas(rosterData) {
 
   // ===== RAV LOGO (Top Right) =====
   try {
-    const logo = await loadImage('./assets/rav-logo.png'); // UPDATE THIS PATH TO YOUR LOGO FILE
+    const logo = await loadImage('./assets/rav_logo.png'); // UPDATE THIS PATH TO YOUR LOGO FILE
     const logoSize = 280;
     const logoX = width - logoSize - 150;
     const logoY = 50;
