@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# State file (contains Discord message IDs)
+roster-state.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
