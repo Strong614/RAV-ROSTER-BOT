@@ -1,4 +1,4 @@
-import { createCanvas } from "canvas";
+import { createCanvas, loadImage } from "canvas";
 
 const RANK_ORDER = [
   "Vanguard Supreme",
@@ -43,6 +43,24 @@ export async function generateRosterCanvas(rosterData) {
   ctx.strokeStyle = "#444";
   ctx.lineWidth = 5;
   ctx.strokeRect(30, 30, width - 60, height - 60);
+
+  // ===== RAV LOGO (Top Right) =====
+  try {
+    const logo = await loadImage('./assets/rav-logo.png'); // UPDATE THIS PATH TO YOUR LOGO FILE
+    const logoSize = 280;
+    const logoX = width - logoSize - 150;
+    const logoY = 50;
+    
+    // Optional: Add a circular background for the logo
+    ctx.fillStyle = "rgba(162, 198, 202, 0.15)";
+    ctx.beginPath();
+    ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+  } catch (err) {
+    console.error('Logo not found:', err);
+  }
 
   // ===== HEADER =====
   ctx.fillStyle = "#a2C6Ca";
@@ -138,19 +156,18 @@ export async function generateRosterCanvas(rosterData) {
       ctx.lineWidth = 4;
       ctx.strokeRect(x, y, boxWidth, boxHeight);
 
-        // ✅ Level indicator - ONLY on leftmost box (OUTSIDE on the left)
-
-        if (index === 0) {
-        const levelNumber = 10 - RANK_ORDER.indexOf(rank); // ✅ REVERSED
+      // Level indicator - ONLY on leftmost box (OUTSIDE on the left)
+      if (index === 0) {
+        const levelNumber = 10 - RANK_ORDER.indexOf(rank);
         ctx.fillStyle = "#a2C6Ca";
         ctx.font = "bold 50px 'Times New Roman'";
         ctx.textAlign = "right";
         ctx.fillText(`LVL ${levelNumber}`, x - 30, y + boxHeight / 2 + 15);
-        }
+      }
 
-        // Rank badge (darker cyan section)
-        ctx.fillStyle = "#7da5a8";
-        ctx.fillRect(x, y, boxWidth, 70);
+      // Rank badge (darker cyan section)
+      ctx.fillStyle = "#7da5a8";
+      ctx.fillRect(x, y, boxWidth, 70);
 
       // Rank badge border
       ctx.strokeStyle = "#ffffff";
