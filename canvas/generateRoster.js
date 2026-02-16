@@ -44,24 +44,6 @@ export async function generateRosterCanvas(rosterData) {
   ctx.lineWidth = 5;
   ctx.strokeRect(30, 30, width - 60, height - 60);
 
-  // ===== RAV LOGO (Top Right) =====
-  try {
-    const logo = await loadImage('./assets/rav_logo.png'); // UPDATE THIS PATH TO YOUR LOGO FILE
-    const logoSize = 280;
-    const logoX = width - logoSize - 150;
-    const logoY = 50;
-    
-    // Optional: Add a circular background for the logo
-    ctx.fillStyle = "rgba(162, 198, 202, 0.15)";
-    ctx.beginPath();
-    ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 20, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-  } catch (err) {
-    console.error('Logo not found:', err);
-  }
-
   // ===== HEADER =====
   ctx.fillStyle = "#a2C6Ca";
   ctx.font = "bold 120px 'Times New Roman'";
@@ -75,6 +57,18 @@ export async function generateRosterCanvas(rosterData) {
   const dateStr = now.toLocaleDateString("en-GB");
   const timeStr = now.toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' });
   ctx.fillText(`Active members: ${totalMembers} | Updated: ${dateStr} ${timeStr}`, width / 2, 230);
+
+  // ===== RAV LOGO (Top Right - Below Title) =====
+  try {
+    const logo = await loadImage('./assets/rav_logo.png');
+    const logoSize = 450; // Bigger logo
+    const logoX = width - logoSize - 100;
+    const logoY = 80; // Lower position
+    
+    ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+  } catch (err) {
+    console.error('Logo not found:', err);
+  }
 
   // Divider line
   ctx.strokeStyle = "rgba(255,255,255,0.2)";
