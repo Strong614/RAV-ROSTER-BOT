@@ -211,7 +211,7 @@ export async function generateRosterCanvas(rosterData) {
     const groupLabel = getSubGroupLabel(rank);
     if (groupLabel) {
       const bannerX = treeOffsetX;
-      const bannerY = currentY;
+      const bannerY = currentY - 100; // pulls banner up, reduce 100 to close less
       const bannerH = subGroupLabelHeight;
 
       // Measure text width first so we can size the pill around it
@@ -251,7 +251,7 @@ export async function generateRosterCanvas(rosterData) {
       ctx.textAlign = "center";
       ctx.fillText(labelText, treeCenterX, pillY + pillH - 22);
 
-      currentY += bannerH;
+      currentY += bannerH + 40; // small breathing room, adjust 40 to taste
     }
 
     // ---- Connecting lines to previous rank ----
