@@ -211,7 +211,7 @@ export async function generateRosterCanvas(rosterData) {
     const groupLabel = getSubGroupLabel(rank);
     if (groupLabel) {
       const bannerX = treeOffsetX;
-      const bannerY = currentY - 100; // pulls banner up, reduce 100 to close less
+      const bannerY = currentY - 60; // pulls banner up, reduce 100 to close less
       const bannerH = subGroupLabelHeight;
 
       // Measure text width first so we can size the pill around it
