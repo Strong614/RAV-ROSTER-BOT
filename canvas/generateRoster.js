@@ -211,8 +211,7 @@ export async function generateRosterCanvas(rosterData) {
     const groupLabel = getSubGroupLabel(rank);
     if (groupLabel) {
       const bannerX = treeOffsetX;
-      const bannerY = currentY;
-      const bannerH = subGroupLabelHeight;
+      const bannerY = currentY - 80; // increase 80 to close the gap more
 
       // Measure text width first so we can size the pill around it
       ctx.font = "bold 110px 'Times New Roman'";
@@ -251,7 +250,7 @@ export async function generateRosterCanvas(rosterData) {
       ctx.textAlign = "center";
       ctx.fillText(labelText, treeCenterX, pillY + pillH - 22);
 
-      currentY += bannerH;
+      currentY += bannerH + 50;
     }
 
     // ---- Connecting lines to previous rank ----
