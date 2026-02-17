@@ -61,7 +61,7 @@ export async function generateRosterCanvas(rosterData) {
   const rankHeight          = 400;
   const headerHeight        = 350;
   const footerHeight        = 150;
-  const subGroupLabelHeight = 160; // Tall, prominent banner
+  const subGroupLabelHeight = 160; // Tall enough for 110px font
 
   // Count how many sub-group banners will appear
   let bannerCount = 0;
@@ -214,30 +214,42 @@ export async function generateRosterCanvas(rosterData) {
       const bannerY = currentY;
       const bannerH = subGroupLabelHeight;
 
-      // Gradient background
-      const bannerGrad = ctx.createLinearGradient(bannerX, bannerY, bannerX + treeWidth, bannerY);
-      bannerGrad.addColorStop(0, "rgba(162, 198, 202, 0.22)");
-      bannerGrad.addColorStop(1, "rgba(162, 198, 202, 0.04)");
+      // Measure text width first so we can size the pill around it
+      ctx.font = "bold 110px 'Times New Roman'";
+      const labelText   = groupLabel.toUpperCase();
+      const textMetrics = ctx.measureText(labelText);
+      const padX        = 100;
+      const pillW       = textMetrics.width + padX * 2;
+      const pillH       = bannerH - 20;
+      const treeCenterX = treeOffsetX + treeWidth / 2;
+      const pillX       = treeCenterX - pillW / 2; // truly centered
+      const pillY       = bannerY + 10;
+
+      // Compact background pill
+      const bannerGrad = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY);
+      bannerGrad.addColorStop(0, "rgba(162, 198, 202, 0.30)");
+      bannerGrad.addColorStop(0.5, "rgba(162, 198, 202, 0.18)");
+      bannerGrad.addColorStop(1, "rgba(162, 198, 202, 0.30)");
       ctx.fillStyle = bannerGrad;
-      ctx.fillRect(bannerX, bannerY, treeWidth, bannerH);
+      ctx.fillRect(pillX, pillY, pillW, pillH);
 
-      // Left accent bar (thick)
+      // Left accent bar
       ctx.fillStyle = "#a2C6Ca";
-      ctx.fillRect(bannerX, bannerY, 16, bannerH);
+      ctx.fillRect(pillX, pillY, 14, pillH);
 
-      // Bottom border line
-      ctx.strokeStyle = "rgba(162, 198, 202, 0.4)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(bannerX, bannerY + bannerH);
-      ctx.lineTo(bannerX + treeWidth, bannerY + bannerH);
-      ctx.stroke();
+      // Right accent bar
+      ctx.fillRect(pillX + pillW - 14, pillY, 14, pillH);
 
-      // Label text — BIG
+      // Border
+      ctx.strokeStyle = "rgba(162, 198, 202, 0.6)";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(pillX, pillY, pillW, pillH);
+
+      // Centered label text
       ctx.fillStyle = "#a2C6Ca";
-      ctx.font = "bold 90px 'Times New Roman'";
-      ctx.textAlign = "left";
-      ctx.fillText(groupLabel.toUpperCase(), bannerX + 40, bannerY + bannerH - 25);
+      ctx.font = "bold 110px 'Times New Roman'";
+      ctx.textAlign = "center";
+      ctx.fillText(labelText, treeCenterX, pillY + pillH - 22);
 
       currentY += bannerH;
     }
