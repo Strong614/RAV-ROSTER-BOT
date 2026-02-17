@@ -250,7 +250,7 @@ export async function generateRosterCanvas(rosterData) {
       ctx.textAlign = "center";
       ctx.fillText(labelText, treeCenterX, pillY + pillH - 22);
 
-      currentY += bannerH + 50;
+      currentY += subGroupLabelHeight + 50;
     }
 
     // ---- Connecting lines to previous rank ----
