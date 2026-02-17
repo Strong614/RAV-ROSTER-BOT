@@ -1,34 +1,53 @@
 import { createCanvas, loadImage } from "canvas";
 
 const RANK_ORDER = [
-  "Vanguard Supreme",
-  "Phantom Leader",
-  "Phantom Regent",
-  "Night Council",
-  "Black Sigil",
-  "Spectre",
-  "Revenant",
-  "Vantage",
-  "Dagger",
-  "Neophyte"
+  "Vanguard Supreme",   // LVL 10
+  "Phantom Leader",     // LVL 9
+  "Phantom Regent",     // LVL 8
+  "Night Council",      // LVL 7
+  "Black Sigil",        // LVL 6
+  "Spectre",            // LVL 4
+  "Revenant",           // LVL 3
+  "Vantage",            // LVL 2
+  "Dagger",             // LVL 1
+  "Neophyte"            // LVL 0
 ];
+
+// Hardcoded levels — LVL 5 is intentionally skipped
+const RANK_LEVELS = {
+  "Vanguard Supreme": 10,
+  "Phantom Leader":    9,
+  "Phantom Regent":    8,
+  "Night Council":     7,
+  "Black Sigil":       6,
+  "Spectre":           4,
+  "Revenant":          3,
+  "Vantage":           2,
+  "Dagger":            1,
+  "Neophyte":          0
+};
 
 // Honorary is handled separately (purple, left panel)
 const HONORARY_RANK = "Honorary";
 
 // Sub-group labels shown as dividers in the main tree
 const SUB_GROUPS = {
-  "Head Office":      ["Vanguard Supreme", "Phantom Leader", "Phantom Regent"],
-  "Management Team":  ["Night Council", "Black Sigil"],
-  "RAV Members":      ["Spectre", "Revenant", "Vantage", "Dagger", "Neophyte"]
+  "Head Office":     ["Vanguard Supreme", "Phantom Leader", "Phantom Regent"],
+  "Management Team": ["Night Council", "Black Sigil"],
+  "RAV Members":     ["Spectre", "Revenant", "Vantage", "Dagger", "Neophyte"]
 };
 
-// Maps each rank to its sub-group label
+// Returns the sub-group label if this rank is the FIRST rank of a group
 function getSubGroupLabel(rank) {
   for (const [label, ranks] of Object.entries(SUB_GROUPS)) {
-    if (ranks[0] === rank) return label; // Only show label at the FIRST rank of each group
+    if (ranks[0] === rank) return label;
   }
   return null;
+}
+
+// Returns true if this rank starts a new sub-group (i.e. a banner sits above it)
+function isFirstInGroup(rank) {
+  return getSubGroupLabel(rank) !== null;
 }
 
 export async function generateRosterCanvas(rosterData) {
@@ -36,13 +55,13 @@ export async function generateRosterCanvas(rosterData) {
 
   const totalMembers = Object.values(rosterData).reduce((sum, members) => sum + members.length, 0);
 
-  const ranksPresent = RANK_ORDER.filter(rank => rosterData[rank]?.length > 0);
+  const ranksPresent    = RANK_ORDER.filter(rank => rosterData[rank]?.length > 0);
   const honoraryMembers = rosterData[HONORARY_RANK] || [];
 
-  const rankHeight    = 400;
-  const headerHeight  = 350;
-  const footerHeight  = 150;
-  const subGroupLabelHeight = 80; // extra vertical space for sub-group banners
+  const rankHeight          = 400;
+  const headerHeight        = 350;
+  const footerHeight        = 150;
+  const subGroupLabelHeight = 160; // Tall, prominent banner
 
   // Count how many sub-group banners will appear
   let bannerCount = 0;
@@ -51,7 +70,7 @@ export async function generateRosterCanvas(rosterData) {
   const height = headerHeight + (ranksPresent.length * rankHeight) + (bannerCount * subGroupLabelHeight) + footerHeight;
 
   const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext("2d");
+  const ctx    = canvas.getContext("2d");
 
   // ===== BACKGROUND =====
   const bg = ctx.createLinearGradient(0, 0, 0, height);
@@ -98,16 +117,16 @@ export async function generateRosterCanvas(rosterData) {
   // ===================================================
   // ===== LEFT PANEL — HONORARY (Purple) =====
   // ===================================================
-  const honoraryPanelX   = 60;
-  const honoraryPanelW   = 700;
-  const honoraryBoxW     = 580;
-  const honoraryBoxH     = 220;
-  const honoraryGap      = 30;
-  const honoraryStartY   = headerHeight + 60;
+  const honoraryPanelX  = 60;
+  const honoraryPanelW  = 700;
+  const honoraryBoxW    = 580;
+  const honoraryBoxH    = 220;
+  const honoraryGap     = 30;
+  const honoraryStartY  = headerHeight + 60;
 
   if (honoraryMembers.length > 0) {
     // Panel title
-    ctx.fillStyle = "#c084fc"; // purple-400
+    ctx.fillStyle = "#c084fc";
     ctx.font = "bold 56px 'Times New Roman'";
     ctx.textAlign = "center";
     ctx.fillText("HONORARY", honoraryPanelX + honoraryPanelW / 2, honoraryStartY - 20);
@@ -137,11 +156,10 @@ export async function generateRosterCanvas(rosterData) {
       ctx.lineWidth = 4;
       ctx.strokeRect(bx, by, honoraryBoxW, honoraryBoxH);
 
-      // Darker header strip
+      // Header strip
       ctx.fillStyle = "#581c87";
       ctx.fillRect(bx, by, honoraryBoxW, 70);
 
-      // Strip border
       ctx.strokeStyle = "#e9d5ff";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -171,17 +189,23 @@ export async function generateRosterCanvas(rosterData) {
   }
 
   // ===================================================
-  // ===== MAIN ORG CHART (right of honorary panel) =====
+  // ===== MAIN ORG CHART =====
   // ===================================================
-  // Shift the tree to the right to avoid overlapping the honorary panel
-  const treeOffsetX   = honoraryPanelW + 120; // left margin for tree
-  const treeWidth     = width - treeOffsetX - 80;
+  const treeOffsetX = honoraryPanelW + 120;
+  const treeWidth   = width - treeOffsetX - 80;
 
   let currentY = headerHeight + 50;
 
   ranksPresent.forEach((rank, rankIndex) => {
     const members = rosterData[rank];
     if (!members || members.length === 0) return;
+
+    const memberCount   = members.length;
+    const boxWidth      = 500;
+    const boxHeight     = 220;
+    const gap           = 40;
+    const totalRowWidth = (memberCount * boxWidth) + ((memberCount - 1) * gap);
+    const startX        = treeOffsetX + (treeWidth - totalRowWidth) / 2;
 
     // ---- Sub-group banner ----
     const groupLabel = getSubGroupLabel(rank);
@@ -190,40 +214,47 @@ export async function generateRosterCanvas(rosterData) {
       const bannerY = currentY;
       const bannerH = subGroupLabelHeight;
 
-      // Background strip
-      ctx.fillStyle = "rgba(162, 198, 202, 0.12)";
+      // Gradient background
+      const bannerGrad = ctx.createLinearGradient(bannerX, bannerY, bannerX + treeWidth, bannerY);
+      bannerGrad.addColorStop(0, "rgba(162, 198, 202, 0.22)");
+      bannerGrad.addColorStop(1, "rgba(162, 198, 202, 0.04)");
+      ctx.fillStyle = bannerGrad;
       ctx.fillRect(bannerX, bannerY, treeWidth, bannerH);
 
-      // Left accent bar
+      // Left accent bar (thick)
       ctx.fillStyle = "#a2C6Ca";
-      ctx.fillRect(bannerX, bannerY, 10, bannerH);
+      ctx.fillRect(bannerX, bannerY, 16, bannerH);
 
-      // Label text
+      // Bottom border line
+      ctx.strokeStyle = "rgba(162, 198, 202, 0.4)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(bannerX, bannerY + bannerH);
+      ctx.lineTo(bannerX + treeWidth, bannerY + bannerH);
+      ctx.stroke();
+
+      // Label text — BIG
       ctx.fillStyle = "#a2C6Ca";
-      ctx.font = "bold 52px 'Times New Roman'";
+      ctx.font = "bold 90px 'Times New Roman'";
       ctx.textAlign = "left";
-      ctx.fillText(`— ${groupLabel.toUpperCase()} —`, bannerX + 30, bannerY + bannerH - 18);
+      ctx.fillText(groupLabel.toUpperCase(), bannerX + 40, bannerY + bannerH - 25);
 
       currentY += bannerH;
     }
 
-    // ---- Member boxes ----
-    const memberCount = members.length;
-    const boxWidth    = 500;
-    const boxHeight   = 220;
-    const gap         = 40;
+    // ---- Connecting lines to previous rank ----
+    // Skip arrows entirely when this rank opens a new sub-group section
+    const skipArrow = isFirstInGroup(rank);
 
-    const totalRowWidth = (memberCount * boxWidth) + ((memberCount - 1) * gap);
-    // Center within tree area
-    const startX = treeOffsetX + (treeWidth - totalRowWidth) / 2;
-
-    // Connecting lines to previous rank
-    if (rankIndex > 0) {
-      // Find the previous rank that actually has members
+    if (rankIndex > 0 && !skipArrow) {
       let prevRankIndex = rankIndex - 1;
-      while (prevRankIndex >= 0 && (!rosterData[ranksPresent[prevRankIndex]] || rosterData[ranksPresent[prevRankIndex]].length === 0)) {
+      while (
+        prevRankIndex >= 0 &&
+        (!rosterData[ranksPresent[prevRankIndex]] || rosterData[ranksPresent[prevRankIndex]].length === 0)
+      ) {
         prevRankIndex--;
       }
+
       if (prevRankIndex >= 0) {
         const prevRank    = ranksPresent[prevRankIndex];
         const prevMembers = rosterData[prevRank];
@@ -234,12 +265,9 @@ export async function generateRosterCanvas(rosterData) {
         ctx.strokeStyle = "#a2C6Ca";
         ctx.lineWidth   = 8;
 
-        // We need to figure out where prevRank's box bottom was.
-        // Since we track currentY as we go, we use a simple approximation:
-        // The top of the current row is currentY, so prevRow bottom is currentY - rankHeight - (banner at current rank already added)
-        const prevCenterY  = currentY - rankHeight + boxHeight;
+        const prevCenterY    = currentY - rankHeight + boxHeight;
         const currentCenterY = currentY;
-        const prevCenterX  = prevStartX + prevTotal / 2;
+        const prevCenterX    = prevStartX + prevTotal / 2;
 
         ctx.beginPath();
         ctx.moveTo(prevCenterX, prevCenterY);
@@ -263,7 +291,7 @@ export async function generateRosterCanvas(rosterData) {
       }
     }
 
-    // Draw boxes
+    // ---- Draw member boxes ----
     members.forEach((member, index) => {
       const x = startX + (index * (boxWidth + gap));
       const y = currentY;
@@ -281,9 +309,9 @@ export async function generateRosterCanvas(rosterData) {
       ctx.lineWidth = 4;
       ctx.strokeRect(x, y, boxWidth, boxHeight);
 
-      // Level indicator (left of first box)
+      // Level indicator — uses hardcoded map (LVL 5 intentionally skipped)
       if (index === 0) {
-        const levelNumber = 10 - RANK_ORDER.indexOf(rank);
+        const levelNumber = RANK_LEVELS[rank] ?? "?";
         ctx.fillStyle = "#a2C6Ca";
         ctx.font = "bold 50px 'Times New Roman'";
         ctx.textAlign = "right";
