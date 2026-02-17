@@ -96,6 +96,7 @@ client.once("ready", async () => {
   // Load saved state
   state = await loadRosterState();
   console.log(`📂 Loaded state - Message ID: ${state.rosterMessageId || "none"}`);
+  state.lastHash = ""; // Force a fresh render on every startup
 
   // Set presence
   try {
