@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, AttachmentBuilder } from "discord.js";
 import express from "express";
-import { getRoster, getRosterHash } from "./db/postgres.js";
+import { getRoster, getRosterHash, setupRosterListener } from "./db/postgres.js";
 import { generateRosterCanvas } from "./canvas/generateRoster.js";
 import { saveRosterState, loadRosterState } from "./storage/rosterState.js";
 
@@ -113,11 +113,8 @@ client.once("ready", async () => {
   console.log("🚀 Generating initial roster...");
   await updateRoster();
 
-  // Start polling for changes every 30 seconds
-  setInterval(async () => {
-    console.log("🔍 Checking for roster changes...");
-    await updateRoster();
-  }, 30000); // 30 seconds
+  // Listen for DB changes instead of polling
+  await setupRosterListener(updateRoster);
 
   console.log("✅ Roster bot is now monitoring for changes");
 });

@@ -1,7 +1,8 @@
 import pg from "pg";
-const { Pool } = pg;
+const { Pool, Client } = pg;
 
 let pool = null;
+let listenerClient = null;
 
 export function getPool() {
   if (!pool) {
@@ -15,6 +16,30 @@ export function getPool() {
     });
   }
   return pool;
+}
+
+// Setup LISTEN/NOTIFY for roster changes
+export async function setupRosterListener(onChangeCallback) {
+  listenerClient = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  await listenerClient.connect();
+  await listenerClient.query("LISTEN roster_update");
+
+  listenerClient.on("notification", async (msg) => {
+    if (msg.channel === "roster_update") {
+      console.log("📢 Roster change detected via DB notification");
+      await onChangeCallback();
+    }
+  });
+
+  listenerClient.on("error", (err) => {
+    console.error("❌ Listener client error:", err);
+  });
+
+  console.log("👂 Listening for roster changes...");
 }
 
 // Get all active members grouped by rank
@@ -43,7 +68,6 @@ export async function getRoster() {
         name ASC
     `);
 
-    // Group by rank
     const grouped = {};
     result.rows.forEach(member => {
       if (!grouped[member.rank]) {
