@@ -1,16 +1,16 @@
 import { createCanvas, loadImage } from "canvas";
 
 const RANK_ORDER = [
-  "Vanguard Supreme",   // LVL 10
-  "Phantom Leader",     // LVL 9
-  "Phantom Regent",     // LVL 8
-  "Night Council",      // LVL 7
-  "Black Sigil",        // LVL 6
-  "Spectre",            // LVL 4
-  "Revenant",           // LVL 3
-  "Vantage",            // LVL 2
-  "Dagger",             // LVL 1
-  "Neophyte"            // LVL 0
+  "Vanguard Supreme",
+  "Phantom Leader",
+  "Phantom Regent",
+  "Night Council",
+  "Black Sigil",
+  "Spectre",
+  "Revenant",
+  "Vantage",
+  "Dagger",
+  "Neophyte"
 ];
 
 const RANK_LEVELS = {
@@ -34,32 +34,11 @@ const SUB_GROUPS = {
   "RAV Members":     ["Spectre", "Revenant", "Vantage", "Dagger", "Neophyte"]
 };
 
-// Visual style per sub-group
+// One accent color + readable text per sub-group — no gradients needed
 const SUBGROUP_STYLE = {
-  "Head Office": {
-    stripFrom:   "#4a2c00",
-    stripTo:     "#a87010",
-    stripText:   "#ffeebb",
-    accent:      "#c89828",
-    border:      "rgba(200, 152, 40, 0.75)",
-    glow:        "rgba(200, 152, 40, 0.35)",
-  },
-  "Management Team": {
-    stripFrom:   "#062535",
-    stripTo:     "#0e6080",
-    stripText:   "#b0e8f8",
-    accent:      "#20a8d0",
-    border:      "rgba(32, 168, 208, 0.65)",
-    glow:        "rgba(32, 168, 208, 0.30)",
-  },
-  "RAV Members": {
-    stripFrom:   "#0d1a38",
-    stripTo:     "#1e3e88",
-    stripText:   "#b0c8ff",
-    accent:      "#4070d8",
-    border:      "rgba(64, 112, 216, 0.65)",
-    glow:        "rgba(64, 112, 216, 0.30)",
-  },
+  "Head Office":     { accent: "#c89828", text: "#ffeebb", border: "rgba(200,152,40,0.5)"  },
+  "Management Team": { accent: "#20a8d0", text: "#b0e8f8", border: "rgba(32,168,208,0.5)"  },
+  "RAV Members":     { accent: "#4878d8", text: "#b0c8ff", border: "rgba(72,120,216,0.5)"  },
 };
 
 function getSubGroupLabel(rank) {
@@ -80,519 +59,390 @@ function isFirstInGroup(rank) {
   return getSubGroupLabel(rank) !== null;
 }
 
-// Rounded rectangle path helper — r can be a number (uniform) or {tl,tr,br,bl}
+// Simple rounded-rect path (uniform radius only — avoids per-corner branching)
 function rRect(ctx, x, y, w, h, r) {
-  const tl = typeof r === "object" ? (r.tl ?? 0) : r;
-  const tr = typeof r === "object" ? (r.tr ?? 0) : r;
-  const br = typeof r === "object" ? (r.br ?? 0) : r;
-  const bl = typeof r === "object" ? (r.bl ?? 0) : r;
   ctx.beginPath();
-  ctx.moveTo(x + tl, y);
-  ctx.lineTo(x + w - tr, y);
-  ctx.arcTo(x + w, y,     x + w, y + tr,     tr);
-  ctx.lineTo(x + w, y + h - br);
-  ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
-  ctx.lineTo(x + bl, y + h);
-  ctx.arcTo(x,     y + h, x,     y + h - bl, bl);
-  ctx.lineTo(x, y + tl);
-  ctx.arcTo(x,     y,     x + tl, y,          tl);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x,     y + h, x,     y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x,     y,     x + r, y,         r);
+  ctx.closePath();
+}
+
+// Rounded rect with rounded top corners only (for the strip)
+function rRectTop(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x,     y + h);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
 
 export async function generateRosterCanvas(rosterData) {
-  const width = 10000;
+  // ── Canvas & layout constants ─────────────────────────────────────────────
+  const WIDTH          = 4000;
 
-  const totalMembers = Object.values(rosterData).reduce((sum, m) => sum + m.length, 0);
-  const ranksPresent    = RANK_ORDER.filter(rank => rosterData[rank]?.length > 0);
-  const honoraryMembers = rosterData[HONORARY_RANK] || [];
+  const BOX_W          = 380;
+  const BOX_H          = 200;
+  const STRIP_H        = 68;  // top stripe inside each box
+  const BOX_GAP        = 24;
+  const ROW_GAP        = 20;
+  const CORNER_R       = 10;
 
-  // ── Layout constants ──────────────────────────────────────────────────────
-  const BOX_W           = 500;
-  const BOX_H           = 256;
-  const STRIP_H         = 96;   // rank badge strip inside each box
-  const ACCENT_BAR_H    = 8;    // thin sub-group color bar at very top of strip
-  const BOX_GAP         = 44;   // horizontal gap between boxes
-  const ROW_GAP         = 36;   // vertical gap between wrapped rows of the same rank
-  const CORNER_R        = 18;   // box corner radius
+  const HON_PANEL_W    = 460;
+  const TREE_OFFSET_X  = HON_PANEL_W + 80;
+  const TREE_W         = WIDTH - TREE_OFFSET_X - 50;
 
-  const HONORARY_PANEL_W = 720;
-  const TREE_OFFSET_X    = HONORARY_PANEL_W + 120;
-  const TREE_W           = width - TREE_OFFSET_X - 80;
+  const MAX_PER_ROW    = Math.max(1, Math.floor((TREE_W + BOX_GAP) / (BOX_W + BOX_GAP)));
 
-  const MAX_PER_ROW = Math.max(1, Math.floor((TREE_W + BOX_GAP) / (BOX_W + BOX_GAP)));
+  const HEADER_H       = 260;
+  const FOOTER_H       = 100;
+  const BANNER_H       = 100; // height reserved for each sub-group divider
 
   function rankBlockH(n) {
     const rows = Math.ceil(n / MAX_PER_ROW);
-    return rows * BOX_H + (rows - 1) * ROW_GAP + 90;
+    return rows * BOX_H + (rows - 1) * ROW_GAP + 70;
   }
 
-  const HEADER_H         = 360;
-  const FOOTER_H         = 160;
-  const BANNER_H         = 168;
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const totalMembers    = Object.values(rosterData).reduce((s, m) => s + m.length, 0);
+  const ranksPresent    = RANK_ORDER.filter(r => rosterData[r]?.length > 0);
+  const honoraryMembers = rosterData[HONORARY_RANK] || [];
 
-  // Height pre-pass
+  // ── Height pre-pass ───────────────────────────────────────────────────────
   let totalContentH = 0;
   ranksPresent.forEach(rank => {
-    if (getSubGroupLabel(rank)) totalContentH += BANNER_H + 44;
+    if (getSubGroupLabel(rank)) totalContentH += BANNER_H;
     totalContentH += rankBlockH(rosterData[rank]?.length || 0);
   });
-  const height = HEADER_H + totalContentH + FOOTER_H;
+  const HEIGHT = HEADER_H + totalContentH + FOOTER_H;
 
-  const canvas = createCanvas(width, height);
+  // ── Canvas setup ──────────────────────────────────────────────────────────
+  const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx    = canvas.getContext("2d");
 
-  // ── BACKGROUND ─────────────────────────────────────────────────────────────
-  const bg = ctx.createLinearGradient(0, 0, 0, height);
-  bg.addColorStop(0,   "#141620");
-  bg.addColorStop(0.5, "#0f1018");
-  bg.addColorStop(1,   "#0a0b10");
+  // Background — simple dark gradient, no texture loop
+  const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+  bg.addColorStop(0, "#141820");
+  bg.addColorStop(1, "#0c0e14");
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  // Subtle diagonal texture — fine dots
-  ctx.fillStyle = "rgba(255,255,255,0.012)";
-  for (let ty = 0; ty < height; ty += 60) {
-    for (let tx = 0; tx < width; tx += 60) {
-      ctx.fillRect(tx, ty, 2, 2);
-    }
-  }
-
-  // ── OUTER BORDER ───────────────────────────────────────────────────────────
-  ctx.save();
-  ctx.shadowColor = "rgba(162,198,202,0.25)";
-  ctx.shadowBlur  = 30;
-  rRect(ctx, 28, 28, width - 56, height - 56, 20);
-  ctx.strokeStyle = "rgba(162,198,202,0.5)";
-  ctx.lineWidth   = 4;
-  ctx.stroke();
-  ctx.restore();
-
-  // ── HEADER ─────────────────────────────────────────────────────────────────
-  // Corner accent lines flanking the title
-  const titleY = 165;
-  ctx.save();
-  ctx.strokeStyle = "rgba(162,198,202,0.4)";
+  // Outer border — plain rect, no shadow
+  ctx.strokeStyle = "rgba(162,198,202,0.35)";
   ctx.lineWidth   = 3;
-  const titleHalf = 560;
-  ctx.beginPath(); ctx.moveTo(width / 2 - titleHalf - 80, titleY - 55);
-  ctx.lineTo(width / 2 - titleHalf, titleY - 55); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(width / 2 + titleHalf, titleY - 55);
-  ctx.lineTo(width / 2 + titleHalf + 80, titleY - 55); ctx.stroke();
-  ctx.restore();
+  ctx.strokeRect(20, 20, WIDTH - 40, HEIGHT - 40);
 
-  // Title glow
-  ctx.save();
-  ctx.shadowColor = "rgba(162,198,202,0.7)";
-  ctx.shadowBlur  = 40;
-  ctx.fillStyle   = "#c8e8ec";
-  ctx.font        = "bold 130px 'Times New Roman'";
-  ctx.textAlign   = "center";
-  ctx.fillText("RAV ROSTER", width / 2, titleY);
-  ctx.restore();
+  // ── Header ────────────────────────────────────────────────────────────────
+  ctx.fillStyle = "#a8d8dc";
+  ctx.font      = "bold 86px 'Times New Roman'";
+  ctx.textAlign = "center";
+  ctx.fillText("RAV ROSTER", WIDTH / 2, 120);
 
-  // Subtitle
   const now     = new Date();
   const dateStr = now.toLocaleDateString("en-GB");
   const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  ctx.fillStyle = "#8aa8ac";
-  ctx.font      = "50px 'Times New Roman'";
-  ctx.textAlign = "center";
-  ctx.fillText(`${totalMembers} active members  ·  Updated ${dateStr} at ${timeStr}`, width / 2, 240);
+  ctx.fillStyle = "#6a8a8e";
+  ctx.font      = "34px 'Times New Roman'";
+  ctx.fillText(`${totalMembers} active members  ·  ${dateStr} at ${timeStr}`, WIDTH / 2, 170);
 
-  // Header divider — double line
-  ctx.save();
-  ctx.strokeStyle = "rgba(162,198,202,0.35)";
-  ctx.lineWidth   = 3;
-  ctx.beginPath(); ctx.moveTo(100, 292); ctx.lineTo(width - 100, 292); ctx.stroke();
-  ctx.strokeStyle = "rgba(162,198,202,0.12)";
-  ctx.lineWidth   = 1;
-  ctx.beginPath(); ctx.moveTo(100, 298); ctx.lineTo(width - 100, 298); ctx.stroke();
-  ctx.restore();
+  // Header divider
+  ctx.strokeStyle = "rgba(162,198,202,0.25)";
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(60, 200);
+  ctx.lineTo(WIDTH - 60, 200);
+  ctx.stroke();
 
   // Logo
   try {
-    const logo     = await loadImage("./assets/rav_logo.png");
-    const logoSize = 480;
-    ctx.save();
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(logo, width - logoSize - 110, 360, logoSize, logoSize);
-    ctx.restore();
+    const logo = await loadImage("./assets/rav_logo.png");
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(logo, WIDTH - 420, 16, 380, 380);
+    ctx.globalAlpha = 1;
   } catch (err) {
     console.error("Logo not found:", err);
   }
 
-  // ── HONORARY PANEL ─────────────────────────────────────────────────────────
-  const HON_PAN_X   = 60;
-  const HON_BOX_W   = 590;
-  const HON_BOX_H   = 230;
-  const HON_GAP     = 32;
-  const HON_START_Y = HEADER_H + 70;
+  // ── Honorary panel ────────────────────────────────────────────────────────
+  const HON_BOX_W   = 400;
+  const HON_BOX_H   = 190;
+  const HON_PAN_X   = 30;
+  const HON_GAP     = 18;
+  const HON_START_Y = HEADER_H + 60;
 
   if (honoraryMembers.length > 0) {
-    // Section label
-    ctx.save();
-    ctx.shadowColor = "rgba(192,132,252,0.6)";
-    ctx.shadowBlur  = 24;
-    ctx.fillStyle   = "#d8a8ff";
-    ctx.font        = "bold 58px 'Times New Roman'";
-    ctx.textAlign   = "center";
-    ctx.fillText("HONORARY", HON_PAN_X + HONORARY_PANEL_W / 2, HON_START_Y - 24);
-    ctx.restore();
+    ctx.fillStyle = "#c084fc";
+    ctx.font      = "bold 44px 'Times New Roman'";
+    ctx.textAlign = "center";
+    ctx.fillText("HONORARY", HON_PAN_X + HON_PANEL_W / 2, HON_START_Y - 18);
 
-    // Underline
-    ctx.save();
-    ctx.shadowColor = "rgba(192,132,252,0.5)";
-    ctx.shadowBlur  = 14;
-    ctx.strokeStyle = "#c084fc";
-    ctx.lineWidth   = 3;
+    ctx.strokeStyle = "rgba(192,132,252,0.5)";
+    ctx.lineWidth   = 2;
     ctx.beginPath();
-    ctx.moveTo(HON_PAN_X + 40, HON_START_Y - 8);
-    ctx.lineTo(HON_PAN_X + HONORARY_PANEL_W - 40, HON_START_Y - 8);
+    ctx.moveTo(HON_PAN_X + 20, HON_START_Y - 4);
+    ctx.lineTo(HON_PAN_X + HON_PANEL_W - 20, HON_START_Y - 4);
     ctx.stroke();
-    ctx.restore();
 
     honoraryMembers.forEach((member, idx) => {
-      const bx = HON_PAN_X + (HONORARY_PANEL_W - HON_BOX_W) / 2;
-      const by = HON_START_Y + 24 + idx * (HON_BOX_H + HON_GAP);
+      const bx = HON_PAN_X + (HON_PANEL_W - HON_BOX_W) / 2;
+      const by = HON_START_Y + 16 + idx * (HON_BOX_H + HON_GAP);
 
-      // Drop shadow
-      ctx.save();
-      ctx.shadowColor  = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur   = 22;
-      ctx.shadowOffsetX = 5;
-      ctx.shadowOffsetY = 6;
+      // Box — flat dark purple
       rRect(ctx, bx, by, HON_BOX_W, HON_BOX_H, CORNER_R);
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = "#2a1040";
       ctx.fill();
-      ctx.restore();
-
-      // Box gradient — purple
-      const honBodyGrad = ctx.createLinearGradient(bx, by, bx, by + HON_BOX_H);
-      honBodyGrad.addColorStop(0, "#6d1aaa");
-      honBodyGrad.addColorStop(1, "#3d0870");
       rRect(ctx, bx, by, HON_BOX_W, HON_BOX_H, CORNER_R);
-      ctx.fillStyle = honBodyGrad;
-      ctx.fill();
-
-      // Glow border
-      ctx.save();
-      ctx.shadowColor = "rgba(192,100,255,0.55)";
-      ctx.shadowBlur  = 18;
-      rRect(ctx, bx, by, HON_BOX_W, HON_BOX_H, CORNER_R);
-      ctx.strokeStyle = "rgba(210,140,255,0.8)";
-      ctx.lineWidth   = 3;
+      ctx.strokeStyle = "rgba(192,100,255,0.55)";
+      ctx.lineWidth   = 2;
       ctx.stroke();
-      ctx.restore();
 
-      // Strip gradient
-      const honStripGrad = ctx.createLinearGradient(bx, by, bx, by + 75);
-      honStripGrad.addColorStop(0, "#4a0880");
-      honStripGrad.addColorStop(1, "#320560");
-      rRect(ctx, bx, by, HON_BOX_W, 75, { tl: CORNER_R, tr: CORNER_R, br: 0, bl: 0 });
-      ctx.fillStyle = honStripGrad;
+      // Top strip
+      rRectTop(ctx, bx, by, HON_BOX_W, 62, CORNER_R);
+      ctx.fillStyle = "#3d0870";
       ctx.fill();
 
-      // Strip separator
-      ctx.strokeStyle = "rgba(210,140,255,0.4)";
+      ctx.strokeStyle = "rgba(192,100,255,0.3)";
       ctx.lineWidth   = 1;
       ctx.beginPath();
-      ctx.moveTo(bx + 12, by + 75);
-      ctx.lineTo(bx + HON_BOX_W - 12, by + 75);
+      ctx.moveTo(bx + 8, by + 62);
+      ctx.lineTo(bx + HON_BOX_W - 8, by + 62);
       ctx.stroke();
 
-      // Rank label
-      ctx.fillStyle = "#e4b8ff";
-      ctx.font      = "bold 36px 'Times New Roman'";
-      ctx.textAlign = "center";
-      ctx.fillText("HONORARY", bx + HON_BOX_W / 2, by + 52);
-
-      // Member name
-      ctx.fillStyle = "#f5e8ff";
-      ctx.font      = "bold 56px 'Times New Roman'";
-      const honName = member.name.length > 18 ? member.name.substring(0, 16) + "…" : member.name;
-      ctx.fillText(honName, bx + HON_BOX_W / 2, by + 142);
-
-      // Username
-      ctx.font      = "38px 'Times New Roman'";
+      // 4px accent bar at very top
+      rRectTop(ctx, bx, by, HON_BOX_W, 5, CORNER_R);
       ctx.fillStyle = "#c084fc";
+      ctx.fill();
+
+      ctx.fillStyle = "#e4b8ff";
+      ctx.font      = "bold 30px 'Times New Roman'";
+      ctx.textAlign = "center";
+      ctx.fillText("HONORARY", bx + HON_BOX_W / 2, by + 46);
+
+      ctx.fillStyle = "#f0e0ff";
+      ctx.font      = "bold 42px 'Times New Roman'";
+      const honName = member.name.length > 17 ? member.name.substring(0, 15) + "…" : member.name;
+      ctx.fillText(honName, bx + HON_BOX_W / 2, by + 118);
+
+      ctx.fillStyle = "#9050c0";
+      ctx.font      = "italic 28px 'Times New Roman'";
       const honUser = `@${member.username}`;
-      const honUserDisplay = honUser.length > 22 ? honUser.substring(0, 20) + "…" : honUser;
-      ctx.fillText(honUserDisplay, bx + HON_BOX_W / 2, by + 198);
+      ctx.fillText(honUser.length > 20 ? honUser.substring(0, 18) + "…" : honUser,
+        bx + HON_BOX_W / 2, by + 160);
     });
   }
 
-  // ── MAIN ORG CHART ─────────────────────────────────────────────────────────
-  let currentY      = HEADER_H + 50;
-  let prevBottomY   = 0;
-  let prevCenterX   = 0;
+  // ── Main org chart ────────────────────────────────────────────────────────
+  let currentY    = HEADER_H + 30;
+  let prevBottomY = 0;
+  let prevCenterX = 0;
 
   ranksPresent.forEach((rank, rankIndex) => {
     const members     = rosterData[rank];
-    if (!members || members.length === 0) return;
+    if (!members?.length) return;
 
     const memberCount = members.length;
     const rows        = Math.ceil(memberCount / MAX_PER_ROW);
     const blockH      = rankBlockH(memberCount);
     const treeCenterX = TREE_OFFSET_X + TREE_W / 2;
-    const subGroup    = getRankSubGroup(rank);
-    const style       = SUBGROUP_STYLE[subGroup];
+    const style       = SUBGROUP_STYLE[getRankSubGroup(rank)];
 
-    // ── Sub-group banner ──────────────────────────────────────────────────
+    // ── Sub-group divider — simple rule + label + rule ──────────────────
     const groupLabel = getSubGroupLabel(rank);
     if (groupLabel) {
-      const bannerY = currentY - 64;
+      const divY = currentY + BANNER_H / 2 - 8;
 
-      ctx.font = "bold 110px 'Times New Roman'";
-      const label       = groupLabel.toUpperCase();
-      const textW       = ctx.measureText(label).width;
-      const padX        = 110;
-      const pillW       = textW + padX * 2;
-      const pillH       = BANNER_H - 24;
-      const pillX       = treeCenterX - pillW / 2;
-      const pillY       = bannerY + 12;
+      ctx.font = "bold 68px 'Times New Roman'";
+      const label  = groupLabel.toUpperCase();
+      const textW  = ctx.measureText(label).width;
+      const padX   = 36;
+      const lineY  = divY + 10;
 
-      // Pill background
-      const pillGrad = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY);
-      pillGrad.addColorStop(0,   `${style.glow.replace("0.30", "0.22")}`);
-      pillGrad.addColorStop(0.5, `${style.glow.replace("0.30", "0.10")}`);
-      pillGrad.addColorStop(1,   `${style.glow.replace("0.30", "0.22")}`);
-      ctx.save();
-      rRect(ctx, pillX, pillY, pillW, pillH, 16);
-      ctx.fillStyle = pillGrad;
-      ctx.fill();
-
-      // Pill border with glow
-      ctx.shadowColor = style.accent;
-      ctx.shadowBlur  = 20;
-      rRect(ctx, pillX, pillY, pillW, pillH, 16);
-      ctx.strokeStyle = style.border;
-      ctx.lineWidth   = 3;
+      // Left rule
+      ctx.strokeStyle = style.accent;
+      ctx.lineWidth   = 2;
+      ctx.beginPath();
+      ctx.moveTo(TREE_OFFSET_X + 16, lineY);
+      ctx.lineTo(treeCenterX - textW / 2 - padX, lineY);
       ctx.stroke();
-      ctx.restore();
 
-      // Left + right accent bars
-      rRect(ctx, pillX, pillY, 12, pillH, { tl: 16, tr: 0, br: 0, bl: 16 });
+      // Right rule
+      ctx.beginPath();
+      ctx.moveTo(treeCenterX + textW / 2 + padX, lineY);
+      ctx.lineTo(TREE_OFFSET_X + TREE_W - 16, lineY);
+      ctx.stroke();
+
+      // Label
       ctx.fillStyle = style.accent;
-      ctx.fill();
-      rRect(ctx, pillX + pillW - 12, pillY, 12, pillH, { tl: 0, tr: 16, br: 16, bl: 0 });
-      ctx.fill();
+      ctx.textAlign = "center";
+      ctx.fillText(label, treeCenterX, divY + 6);
 
-      // Label text with glow
-      ctx.save();
-      ctx.shadowColor = style.accent;
-      ctx.shadowBlur  = 28;
-      ctx.fillStyle   = style.stripText;
-      ctx.font        = "bold 110px 'Times New Roman'";
-      ctx.textAlign   = "center";
-      ctx.fillText(label, treeCenterX, pillY + pillH - 20);
-      ctx.restore();
-
-      currentY += BANNER_H + 44;
+      currentY += BANNER_H;
     }
 
-    // ── Connecting lines ──────────────────────────────────────────────────
-    const skipArrow = isFirstInGroup(rank);
+    // ── Connecting lines (no shadow) ─────────────────────────────────────
+    if (rankIndex > 0 && !isFirstInGroup(rank) && prevBottomY > 0) {
+      const fCount  = Math.min(memberCount, MAX_PER_ROW);
+      const fWidth  = fCount * BOX_W + (fCount - 1) * BOX_GAP;
+      const fStartX = TREE_OFFSET_X + (TREE_W - fWidth) / 2;
 
-    if (rankIndex > 0 && !skipArrow && prevBottomY > 0) {
-      const firstRowCount  = Math.min(memberCount, MAX_PER_ROW);
-      const firstRowWidth  = firstRowCount * BOX_W + (firstRowCount - 1) * BOX_GAP;
-      const firstRowStartX = TREE_OFFSET_X + (TREE_W - firstRowWidth) / 2;
-
-      ctx.save();
-      ctx.strokeStyle = "#a2c6ca";
-      ctx.lineWidth   = 7;
+      ctx.strokeStyle = "#5a9ca8";
+      ctx.lineWidth   = 5;
       ctx.lineCap     = "round";
-      ctx.shadowColor = "rgba(162,198,202,0.55)";
-      ctx.shadowBlur  = 18;
 
-      // Vertical stem from previous rank
       ctx.beginPath();
       ctx.moveTo(prevCenterX, prevBottomY);
-      ctx.lineTo(prevCenterX, currentY - 18);
+      ctx.lineTo(prevCenterX, currentY - 14);
       ctx.stroke();
 
-      // Horizontal spread
       if (memberCount > 1) {
         ctx.beginPath();
-        ctx.moveTo(firstRowStartX + BOX_W / 2, currentY - 22);
-        ctx.lineTo(firstRowStartX + firstRowWidth - BOX_W / 2, currentY - 22);
+        ctx.moveTo(fStartX + BOX_W / 2, currentY - 18);
+        ctx.lineTo(fStartX + fWidth - BOX_W / 2, currentY - 18);
         ctx.stroke();
       }
 
-      // Short drops into each box top
-      for (let i = 0; i < firstRowCount; i++) {
-        const lx = firstRowStartX + i * (BOX_W + BOX_GAP) + BOX_W / 2;
+      for (let i = 0; i < fCount; i++) {
+        const lx = fStartX + i * (BOX_W + BOX_GAP) + BOX_W / 2;
         ctx.beginPath();
-        ctx.moveTo(lx, currentY - 22);
-        ctx.lineTo(lx, currentY - 2);
+        ctx.moveTo(lx, currentY - 18);
+        ctx.lineTo(lx, currentY);
         ctx.stroke();
       }
-      ctx.restore();
     }
 
     // ── Member boxes ─────────────────────────────────────────────────────
     for (let row = 0; row < rows; row++) {
-      const rowMembers  = members.slice(row * MAX_PER_ROW, (row + 1) * MAX_PER_ROW);
-      const rowCount    = rowMembers.length;
-      const rowW        = rowCount * BOX_W + (rowCount - 1) * BOX_GAP;
-      const rowStartX   = TREE_OFFSET_X + (TREE_W - rowW) / 2;
-      const rowY        = currentY + row * (BOX_H + ROW_GAP);
+      const rowMembers = members.slice(row * MAX_PER_ROW, (row + 1) * MAX_PER_ROW);
+      const rowCount   = rowMembers.length;
+      const rowW       = rowCount * BOX_W + (rowCount - 1) * BOX_GAP;
+      const rowStartX  = TREE_OFFSET_X + (TREE_W - rowW) / 2;
+      const rowY       = currentY + row * (BOX_H + ROW_GAP);
 
       rowMembers.forEach((member, i) => {
         const globalIdx = row * MAX_PER_ROW + i;
         const x = rowStartX + i * (BOX_W + BOX_GAP);
         const y = rowY;
 
-        // ---- Drop shadow ----
-        ctx.save();
-        ctx.shadowColor   = "rgba(0,0,0,0.75)";
-        ctx.shadowBlur    = 24;
-        ctx.shadowOffsetX = 5;
-        ctx.shadowOffsetY = 7;
+        // Box — flat dark fill, single colored border
         rRect(ctx, x, y, BOX_W, BOX_H, CORNER_R);
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = "#1a2830";
         ctx.fill();
-        ctx.restore();
-
-        // ---- Box body gradient (dark, syncs with strip and canvas) ----
-        const bodyGrad = ctx.createLinearGradient(x, y, x, y + BOX_H);
-        bodyGrad.addColorStop(0, "#162830");
-        bodyGrad.addColorStop(1, "#0c1820");
-        rRect(ctx, x, y, BOX_W, BOX_H, CORNER_R);
-        ctx.fillStyle = bodyGrad;
-        ctx.fill();
-
-        // ---- Glowing border per sub-group ----
-        ctx.save();
-        ctx.shadowColor = style.glow;
-        ctx.shadowBlur  = 16;
         rRect(ctx, x, y, BOX_W, BOX_H, CORNER_R);
         ctx.strokeStyle = style.border;
-        ctx.lineWidth   = 3;
+        ctx.lineWidth   = 2;
         ctx.stroke();
-        ctx.restore();
 
-        // ---- Rank badge strip — dark background matching box body ----
-        const stripGrad = ctx.createLinearGradient(x, y, x, y + STRIP_H);
-        stripGrad.addColorStop(0, "#1e3040");
-        stripGrad.addColorStop(1, "#162838");
-        rRect(ctx, x, y, BOX_W, STRIP_H, { tl: CORNER_R, tr: CORNER_R, br: 0, bl: 0 });
-        ctx.fillStyle = stripGrad;
+        // Top strip (slightly lighter)
+        rRectTop(ctx, x, y, BOX_W, STRIP_H, CORNER_R);
+        ctx.fillStyle = "#1e3040";
         ctx.fill();
 
-        // Sub-group accent bar — thin colored line at very top of strip
-        rRect(ctx, x, y, BOX_W, ACCENT_BAR_H, { tl: CORNER_R, tr: CORNER_R, br: 0, bl: 0 });
+        // Strip/body separator
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.lineWidth   = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 8, y + STRIP_H);
+        ctx.lineTo(x + BOX_W - 8, y + STRIP_H);
+        ctx.stroke();
+
+        // Sub-group accent bar — thin top line
+        rRectTop(ctx, x, y, BOX_W, 5, CORNER_R);
         ctx.fillStyle = style.accent;
         ctx.fill();
 
-        // Strip separator line
-        ctx.strokeStyle = "rgba(255,255,255,0.10)";
-        ctx.lineWidth   = 1;
-        ctx.beginPath();
-        ctx.moveTo(x + 14, y + STRIP_H);
-        ctx.lineTo(x + BOX_W - 14, y + STRIP_H);
-        ctx.stroke();
-
-        // ---- Level pill + count badge — only on the first box of each rank ----
+        // ── Level + count badges (left of first box only) ───────────────
         if (globalIdx === 0) {
-          const lvl     = RANK_LEVELS[rank] ?? "?";
-          const PILL_FONT = "bold 44px 'Times New Roman'";
-          ctx.font = PILL_FONT;
-          const lvlText   = `LVL ${lvl}`;
-          const cntText   = `× ${memberCount}`;
-          const pillW     = Math.max(ctx.measureText(lvlText).width, ctx.measureText(cntText).width) + 44;
-          const pillH     = 60;
-          const pillGap   = 12;
-          const pillX     = x - pillW - 20;
-          const lvlPillY  = y + BOX_H / 2 - pillH - pillGap / 2;
-          const cntPillY  = y + BOX_H / 2 + pillGap / 2;
-
-          ctx.save();
-          ctx.shadowColor = style.glow;
-          ctx.shadowBlur  = 16;
+          ctx.font = "bold 32px 'Times New Roman'";
+          const lvlText = `LVL ${RANK_LEVELS[rank] ?? "?"}`;
+          const cntText = `× ${memberCount}`;
+          const pillW   = Math.max(ctx.measureText(lvlText).width,
+                                   ctx.measureText(cntText).width) + 28;
+          const pillH   = 40;
+          const pillGap = 8;
+          const pillX   = x - pillW - 14;
+          const lvlY    = y + BOX_H / 2 - pillH - pillGap / 2;
+          const cntY    = y + BOX_H / 2 + pillGap / 2;
 
           // Level pill
-          rRect(ctx, pillX, lvlPillY, pillW, pillH, 12);
-          ctx.fillStyle = "rgba(8,12,20,0.90)";
+          rRect(ctx, pillX, lvlY, pillW, pillH, 8);
+          ctx.fillStyle = "#0a0e18";
           ctx.fill();
-          rRect(ctx, pillX, lvlPillY, pillW, pillH, 12);
+          rRect(ctx, pillX, lvlY, pillW, pillH, 8);
           ctx.strokeStyle = style.border;
           ctx.lineWidth   = 2;
           ctx.stroke();
 
           // Count pill
-          rRect(ctx, pillX, cntPillY, pillW, pillH, 12);
-          ctx.fillStyle = "rgba(8,12,20,0.90)";
+          rRect(ctx, pillX, cntY, pillW, pillH, 8);
+          ctx.fillStyle = "#0a0e18";
           ctx.fill();
-          rRect(ctx, pillX, cntPillY, pillW, pillH, 12);
+          rRect(ctx, pillX, cntY, pillW, pillH, 8);
           ctx.strokeStyle = style.border;
           ctx.lineWidth   = 2;
           ctx.stroke();
-          ctx.restore();
 
-          ctx.fillStyle = style.stripText;
-          ctx.font      = PILL_FONT;
+          ctx.fillStyle = style.text;
+          ctx.font      = "bold 32px 'Times New Roman'";
           ctx.textAlign = "center";
-          ctx.fillText(lvlText, pillX + pillW / 2, lvlPillY + pillH - 14);
-          ctx.fillText(cntText, pillX + pillW / 2, cntPillY + pillH - 14);
+          ctx.fillText(lvlText, pillX + pillW / 2, lvlY + pillH - 10);
+          ctx.fillText(cntText, pillX + pillW / 2, cntY  + pillH - 10);
         }
 
-        // ---- Rank title in strip — big and clear ----
-        ctx.save();
-        ctx.shadowColor = style.accent;
-        ctx.shadowBlur  = 14;
-        ctx.fillStyle   = style.stripText;
-        ctx.font        = "bold 56px 'Times New Roman'";
-        ctx.textAlign   = "center";
-        const rankLabel = rank.length > 22 ? rank.substring(0, 20) + "…" : rank;
-        ctx.fillText(rankLabel.toUpperCase(), x + BOX_W / 2, y + STRIP_H - 18);
-        ctx.restore();
-
-        // ---- Member name ----
-        ctx.fillStyle = "#d4eef2";
-        ctx.font      = "bold 58px 'Times New Roman'";
+        // ── Rank title (big + clear) ─────────────────────────────────────
+        ctx.fillStyle = style.text;
+        ctx.font      = "bold 44px 'Times New Roman'";
         ctx.textAlign = "center";
-        const nameText = member.name.length > 20 ? member.name.substring(0, 18) + "…" : member.name;
-        ctx.fillText(nameText, x + BOX_W / 2, y + STRIP_H + 88);
+        const rankLabel = rank.length > 20 ? rank.substring(0, 18) + "…" : rank;
+        ctx.fillText(rankLabel.toUpperCase(), x + BOX_W / 2, y + STRIP_H - 16);
 
-        // ---- Username ----
-        ctx.font      = "italic 40px 'Times New Roman'";
-        ctx.fillStyle = "#4a8c9a";
+        // ── Member name ──────────────────────────────────────────────────
+        ctx.fillStyle = "#d8eef2";
+        ctx.font      = "bold 44px 'Times New Roman'";
+        const nameText = member.name.length > 18 ? member.name.substring(0, 16) + "…" : member.name;
+        ctx.fillText(nameText, x + BOX_W / 2, y + STRIP_H + 68);
+
+        // ── Username ─────────────────────────────────────────────────────
+        ctx.fillStyle = "#4a8090";
+        ctx.font      = "italic 30px 'Times New Roman'";
         const uText = `@${member.username}`;
-        const uDisplay = uText.length > 24 ? uText.substring(0, 22) + "…" : uText;
-        ctx.fillText(uDisplay, x + BOX_W / 2, y + STRIP_H + 144);
+        ctx.fillText(uText.length > 22 ? uText.substring(0, 20) + "…" : uText,
+          x + BOX_W / 2, y + STRIP_H + 112);
       });
     }
 
-    // Record bottom of this rank block for the next rank's connecting line
-    const lastRow      = rows - 1;
-    const lastRowCount = memberCount - lastRow * MAX_PER_ROW;
-    const lastRowW     = lastRowCount * BOX_W + (lastRowCount - 1) * BOX_GAP;
-    const lastRowStartX = TREE_OFFSET_X + (TREE_W - lastRowW) / 2;
-    prevBottomY        = currentY + lastRow * (BOX_H + ROW_GAP) + BOX_H;
-    prevCenterX        = lastRowStartX + lastRowW / 2;
+    // Track bottom of this rank block for the next connecting line
+    const lastRow    = rows - 1;
+    const lastCount  = memberCount - lastRow * MAX_PER_ROW;
+    const lastW      = lastCount * BOX_W + (lastCount - 1) * BOX_GAP;
+    const lastStartX = TREE_OFFSET_X + (TREE_W - lastW) / 2;
+    prevBottomY      = currentY + lastRow * (BOX_H + ROW_GAP) + BOX_H;
+    prevCenterX      = lastStartX + lastW / 2;
 
     currentY += blockH;
   });
 
-  // ── FOOTER ─────────────────────────────────────────────────────────────────
-  // Separator
-  ctx.save();
-  ctx.strokeStyle = "rgba(162,198,202,0.2)";
-  ctx.lineWidth   = 2;
+  // ── Footer ────────────────────────────────────────────────────────────────
+  ctx.strokeStyle = "rgba(162,198,202,0.15)";
+  ctx.lineWidth   = 1;
   ctx.beginPath();
-  ctx.moveTo(150, height - FOOTER_H + 10);
-  ctx.lineTo(width - 150, height - FOOTER_H + 10);
+  ctx.moveTo(80, HEIGHT - FOOTER_H + 8);
+  ctx.lineTo(WIDTH - 80, HEIGHT - FOOTER_H + 8);
   ctx.stroke();
-  ctx.restore();
 
-  ctx.fillStyle = "#556a6e";
-  ctx.font      = "36px 'Times New Roman'";
+  ctx.fillStyle = "#4a6468";
+  ctx.font      = "28px 'Times New Roman'";
   ctx.textAlign = "center";
-  ctx.fillText("Generated by RAV Roster Bot", width / 2, height - 88);
-  ctx.fillStyle = "#3a5055";
-  ctx.font      = "32px 'Times New Roman'";
-  ctx.fillText(`${dateStr} at ${timeStr}`, width / 2, height - 44);
+  ctx.fillText(`Generated by RAV Roster Bot  ·  ${dateStr} at ${timeStr}`, WIDTH / 2, HEIGHT - 36);
 
   return canvas.toBuffer();
 }
