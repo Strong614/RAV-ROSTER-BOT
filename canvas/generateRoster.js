@@ -451,12 +451,29 @@ export async function generateRosterCanvas(rosterData) {
           ctx.fillText(cntText, pillX + pillW / 2, cntY  + pillH - 11);
         }
 
-        // ── Rank title ───────────────────────────────────────────────────
+        // ── Rank title — extend strip background if text is wider than box ──
+        const rankLabel  = rank.length > 22 ? rank.substring(0, 20) + "…" : rank;
+        const labelUpper = rankLabel.toUpperCase();
+        ctx.font = "bold 50px 'Times New Roman'";
+        const titleW = ctx.measureText(labelUpper).width;
+        if (titleW > BOX_W - 24) {
+          // Paint a wider strip section centered on the box so text isn't clipped
+          const extW = titleW + 28;
+          const extX = x + (BOX_W - extW) / 2;
+          const extG = ctx.createLinearGradient(extX, y, extX, y + STRIP_H);
+          extG.addColorStop(0, style.stripA);
+          extG.addColorStop(1, style.stripB);
+          rRectTop(ctx, extX, y, extW, STRIP_H, CORNER_R);
+          ctx.fillStyle = extG;
+          ctx.fill();
+          // Repaint accent bar over extension
+          rRectTop(ctx, extX, y, extW, 5, CORNER_R);
+          ctx.fillStyle = style.accent;
+          ctx.fill();
+        }
         ctx.fillStyle = style.text;
-        ctx.font      = "bold 50px 'Times New Roman'";
         ctx.textAlign = "center";
-        const rankLabel = rank.length > 22 ? rank.substring(0, 20) + "…" : rank;
-        ctx.fillText(rankLabel.toUpperCase(), x + BOX_W / 2, y + STRIP_H - 18);
+        ctx.fillText(labelUpper, x + BOX_W / 2, y + STRIP_H - 18);
 
         // ── Member name ──────────────────────────────────────────────────
         ctx.fillStyle = "#d4eaf0";
@@ -470,6 +487,14 @@ export async function generateRosterCanvas(rosterData) {
         const uText = `@${member.username}`;
         ctx.fillText(uText.length > 22 ? uText.substring(0, 20) + "…" : uText,
           x + BOX_W / 2, y + STRIP_H + 128);
+
+        // ── Sarcastic note for Strong ─────────────────────────────────────
+        if (rank === "Vanguard Supreme" && member.username.toLowerCase().includes("strong")) {
+          ctx.fillStyle = "rgba(200,152,40,0.65)";
+          ctx.font      = "italic 32px 'Times New Roman'";
+          ctx.textAlign = "left";
+          ctx.fillText("Often called Sir Lord Commander", x + BOX_W + 18, y + BOX_H / 2 + 12);
+        }
       });
     }
 
