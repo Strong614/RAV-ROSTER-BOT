@@ -413,42 +413,15 @@ export async function generateRosterCanvas(rosterData) {
         ctx.lineTo(x + BOX_W - 10, y + STRIP_H);
         ctx.stroke();
 
-        // ── Level + count badges (left of first box per rank) ────────────
+        // ── Level + count — inside the box, top-right corner of body ────
         if (globalIdx === 0) {
-          ctx.font = "bold 36px 'Times New Roman'";
-          const lvlText = `LVL ${RANK_LEVELS[rank] ?? "?"}`;
-          const cntText = `× ${memberCount}`;
-          const pillW   = Math.max(ctx.measureText(lvlText).width,
-                                   ctx.measureText(cntText).width) + 32;
-          const pillH   = 46;
-          const pillGap = 10;
-          const pillX   = x - pillW - 16;
-          const lvlY    = y + BOX_H / 2 - pillH - pillGap / 2;
-          const cntY    = y + BOX_H / 2 + pillGap / 2;
-
-          // LVL pill
-          rRect(ctx, pillX, lvlY, pillW, pillH, 10);
-          ctx.fillStyle = "#0a0e1a";
-          ctx.fill();
-          rRect(ctx, pillX, lvlY, pillW, pillH, 10);
-          ctx.strokeStyle = style.border;
-          ctx.lineWidth   = 2;
-          ctx.stroke();
-
-          // Count pill
-          rRect(ctx, pillX, cntY, pillW, pillH, 10);
-          ctx.fillStyle = "#0a0e1a";
-          ctx.fill();
-          rRect(ctx, pillX, cntY, pillW, pillH, 10);
-          ctx.strokeStyle = style.border;
-          ctx.lineWidth   = 2;
-          ctx.stroke();
-
+          ctx.textAlign = "right";
           ctx.fillStyle = style.text;
-          ctx.font      = "bold 36px 'Times New Roman'";
-          ctx.textAlign = "center";
-          ctx.fillText(lvlText, pillX + pillW / 2, lvlY + pillH - 11);
-          ctx.fillText(cntText, pillX + pillW / 2, cntY  + pillH - 11);
+          ctx.font      = "bold 28px 'Times New Roman'";
+          ctx.fillText(`LVL ${RANK_LEVELS[rank] ?? "?"}`, x + BOX_W - 12, y + STRIP_H + 36);
+          ctx.fillStyle = "rgba(180,210,220,0.55)";
+          ctx.font      = "26px 'Times New Roman'";
+          ctx.fillText(`× ${memberCount}`, x + BOX_W - 12, y + STRIP_H + 64);
         }
 
         // ── Rank title — extend strip background if text is wider than box ──
