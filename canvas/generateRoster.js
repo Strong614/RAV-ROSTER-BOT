@@ -110,12 +110,12 @@ function rRectTop(ctx, x, y, w, h, r) {
 export async function generateRosterCanvas(rosterData) {
 
   // ── Layout ────────────────────────────────────────────────────────────────
-  const WIDTH         = 6000;
+  const WIDTH         = 8000;
 
-  const BOX_W         = 450;
-  const BOX_H         = 220;
-  const STRIP_H       = 78;
-  const BOX_GAP       = 32;
+  const BOX_W         = 500;
+  const BOX_H         = 210;
+  const STRIP_H       = 76;
+  const BOX_GAP       = 36;
   const ROW_GAP       = 26;
   const CORNER_R      = 14;
 
@@ -163,21 +163,24 @@ export async function generateRosterCanvas(rosterData) {
   ctx.strokeRect(24, 24, WIDTH - 48, HEIGHT - 48);
 
   // ── Header ────────────────────────────────────────────────────────────────
+  // Tree center — title and subtitle align to the tree, not the full canvas
+  const treeCenterX = TREE_OFFSET_X + TREE_W / 2;
+
   // Accent line above title
   ctx.fillStyle = "#a8d8dc";
-  ctx.fillRect(WIDTH / 2 - 420, 48, 840, 4);
+  ctx.fillRect(treeCenterX - 420, 48, 840, 4);
 
   ctx.fillStyle = "#c4e4e8";
   ctx.font      = "bold 110px 'Times New Roman'";
   ctx.textAlign = "center";
-  ctx.fillText("RAV ROSTER", WIDTH / 2, 148);
+  ctx.fillText("RAV ROSTER", treeCenterX, 148);
 
   const now     = new Date();
   const dateStr = now.toLocaleDateString("en-GB");
   const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   ctx.fillStyle = "#607a7e";
   ctx.font      = "42px 'Times New Roman'";
-  ctx.fillText(`${totalMembers} active members  ·  ${dateStr} at ${timeStr}`, WIDTH / 2, 208);
+  ctx.fillText(`${totalMembers} active members  ·  ${dateStr} at ${timeStr}`, treeCenterX, 208);
 
   // Divider
   ctx.strokeStyle = "rgba(162,198,202,0.20)";
@@ -286,7 +289,6 @@ export async function generateRosterCanvas(rosterData) {
     const memberCount = members.length;
     const rows        = Math.ceil(memberCount / MAX_PER_ROW);
     const blockH      = rankBlockH(memberCount);
-    const treeCenterX = TREE_OFFSET_X + TREE_W / 2;
     const style       = SUBGROUP_STYLE[getRankSubGroup(rank)];
 
     // ── Sub-group banner (pill, no shadow) ───────────────────────────────
