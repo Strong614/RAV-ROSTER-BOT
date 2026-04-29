@@ -430,9 +430,9 @@ export async function generateRosterCanvas(rosterData) {
         ctx.font = "bold 50px 'Times New Roman'";
         const titleW = ctx.measureText(labelUpper).width;
         if (titleW > BOX_W - 24) {
-          // Extend strip to the RIGHT only — never bleed left into the LVL pill
-          const extX = x + 8;
+          // Center the extended strip on the text (LVL pills are now inside the box)
           const extW = titleW + 28;
+          const extX = x + BOX_W / 2 - extW / 2;
           const extG = ctx.createLinearGradient(extX, y, extX, y + STRIP_H);
           extG.addColorStop(0, style.stripA);
           extG.addColorStop(1, style.stripB);
@@ -462,10 +462,23 @@ export async function generateRosterCanvas(rosterData) {
 
         // ── Sarcastic note for Strong ─────────────────────────────────────
         if (rank === "Vanguard Supreme" && member.username.toLowerCase() === "mas3ouda") {
-          ctx.fillStyle = "rgba(200,152,40,0.65)";
-          ctx.font      = "italic 32px 'Times New Roman'";
+          const noteText = "✦ Often called Sir Lord Commander";
+          ctx.font = "italic 34px 'Times New Roman'";
+          const noteW = ctx.measureText(noteText).width;
+          const noteX = x + BOX_W + 20;
+          const noteY = y + BOX_H / 2;
+          // Dark pill background for contrast
+          rRect(ctx, noteX - 14, noteY - 34, noteW + 28, 46, 8);
+          ctx.fillStyle = "rgba(10,12,20,0.82)";
+          ctx.fill();
+          rRect(ctx, noteX - 14, noteY - 34, noteW + 28, 46, 8);
+          ctx.strokeStyle = "rgba(200,152,40,0.6)";
+          ctx.lineWidth   = 2;
+          ctx.stroke();
+          // Text
+          ctx.fillStyle = "#f0c040";
           ctx.textAlign = "left";
-          ctx.fillText("Often called Sir Lord Commander", x + BOX_W + 18, y + BOX_H / 2 + 12);
+          ctx.fillText(noteText, noteX, noteY);
         }
       });
     }
