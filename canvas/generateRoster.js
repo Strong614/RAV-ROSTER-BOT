@@ -457,16 +457,15 @@ export async function generateRosterCanvas(rosterData) {
         ctx.font = "bold 50px 'Times New Roman'";
         const titleW = ctx.measureText(labelUpper).width;
         if (titleW > BOX_W - 24) {
-          // Paint a wider strip section centered on the box so text isn't clipped
+          // Extend strip to the RIGHT only — never bleed left into the LVL pill
+          const extX = x + 8;
           const extW = titleW + 28;
-          const extX = x + (BOX_W - extW) / 2;
           const extG = ctx.createLinearGradient(extX, y, extX, y + STRIP_H);
           extG.addColorStop(0, style.stripA);
           extG.addColorStop(1, style.stripB);
           rRectTop(ctx, extX, y, extW, STRIP_H, CORNER_R);
           ctx.fillStyle = extG;
           ctx.fill();
-          // Repaint accent bar over extension
           rRectTop(ctx, extX, y, extW, 5, CORNER_R);
           ctx.fillStyle = style.accent;
           ctx.fill();
@@ -489,7 +488,7 @@ export async function generateRosterCanvas(rosterData) {
           x + BOX_W / 2, y + STRIP_H + 128);
 
         // ── Sarcastic note for Strong ─────────────────────────────────────
-        if (rank === "Vanguard Supreme" && member.username.toLowerCase().includes("strong")) {
+        if (rank === "Vanguard Supreme" && member.username.toLowerCase() === "mas3ouda") {
           ctx.fillStyle = "rgba(200,152,40,0.65)";
           ctx.font      = "italic 32px 'Times New Roman'";
           ctx.textAlign = "left";
