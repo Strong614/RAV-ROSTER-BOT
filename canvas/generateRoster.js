@@ -108,8 +108,9 @@ export async function generateRosterCanvas(rosterData) {
 
   // ── Layout constants ──────────────────────────────────────────────────────
   const BOX_W           = 500;
-  const BOX_H           = 230;
-  const STRIP_H         = 78;   // rank badge strip inside each box
+  const BOX_H           = 256;
+  const STRIP_H         = 96;   // rank badge strip inside each box
+  const ACCENT_BAR_H    = 8;    // thin sub-group color bar at very top of strip
   const BOX_GAP         = 44;   // horizontal gap between boxes
   const ROW_GAP         = 36;   // vertical gap between wrapped rows of the same rank
   const CORNER_R        = 18;   // box corner radius
@@ -453,10 +454,10 @@ export async function generateRosterCanvas(rosterData) {
         ctx.fill();
         ctx.restore();
 
-        // ---- Box body gradient ----
+        // ---- Box body gradient (dark, syncs with strip and canvas) ----
         const bodyGrad = ctx.createLinearGradient(x, y, x, y + BOX_H);
-        bodyGrad.addColorStop(0, "#cce8ec");
-        bodyGrad.addColorStop(1, "#8abec6");
+        bodyGrad.addColorStop(0, "#162830");
+        bodyGrad.addColorStop(1, "#0c1820");
         rRect(ctx, x, y, BOX_W, BOX_H, CORNER_R);
         ctx.fillStyle = bodyGrad;
         ctx.fill();
@@ -471,74 +472,95 @@ export async function generateRosterCanvas(rosterData) {
         ctx.stroke();
         ctx.restore();
 
-        // ---- Rank badge strip (top of box) ----
+        // ---- Rank badge strip — dark background matching box body ----
         const stripGrad = ctx.createLinearGradient(x, y, x, y + STRIP_H);
-        stripGrad.addColorStop(0, style.stripFrom);
-        stripGrad.addColorStop(1, style.stripTo);
+        stripGrad.addColorStop(0, "#1e3040");
+        stripGrad.addColorStop(1, "#162838");
         rRect(ctx, x, y, BOX_W, STRIP_H, { tl: CORNER_R, tr: CORNER_R, br: 0, bl: 0 });
         ctx.fillStyle = stripGrad;
         ctx.fill();
 
+        // Sub-group accent bar — thin colored line at very top of strip
+        rRect(ctx, x, y, BOX_W, ACCENT_BAR_H, { tl: CORNER_R, tr: CORNER_R, br: 0, bl: 0 });
+        ctx.fillStyle = style.accent;
+        ctx.fill();
+
         // Strip separator line
-        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.strokeStyle = "rgba(255,255,255,0.10)";
         ctx.lineWidth   = 1;
         ctx.beginPath();
         ctx.moveTo(x + 14, y + STRIP_H);
         ctx.lineTo(x + BOX_W - 14, y + STRIP_H);
         ctx.stroke();
 
-        // ---- Level pill — only on the first box of each rank ----
+        // ---- Level pill + count badge — only on the first box of each rank ----
         if (globalIdx === 0) {
           const lvl     = RANK_LEVELS[rank] ?? "?";
-          const lvlText = `LVL ${lvl}`;
-          ctx.font = "bold 42px 'Times New Roman'";
-          const lvlW  = ctx.measureText(lvlText).width + 40;
-          const lvlH  = 58;
-          const lvlX  = x - lvlW - 18;
-          const lvlY  = y + (BOX_H - lvlH) / 2;
+          const PILL_FONT = "bold 44px 'Times New Roman'";
+          ctx.font = PILL_FONT;
+          const lvlText   = `LVL ${lvl}`;
+          const cntText   = `× ${memberCount}`;
+          const pillW     = Math.max(ctx.measureText(lvlText).width, ctx.measureText(cntText).width) + 44;
+          const pillH     = 60;
+          const pillGap   = 12;
+          const pillX     = x - pillW - 20;
+          const lvlPillY  = y + BOX_H / 2 - pillH - pillGap / 2;
+          const cntPillY  = y + BOX_H / 2 + pillGap / 2;
 
-          // Pill background
           ctx.save();
           ctx.shadowColor = style.glow;
-          ctx.shadowBlur  = 14;
-          rRect(ctx, lvlX, lvlY, lvlW, lvlH, 12);
-          ctx.fillStyle = "rgba(10,14,24,0.88)";
+          ctx.shadowBlur  = 16;
+
+          // Level pill
+          rRect(ctx, pillX, lvlPillY, pillW, pillH, 12);
+          ctx.fillStyle = "rgba(8,12,20,0.90)";
           ctx.fill();
-          rRect(ctx, lvlX, lvlY, lvlW, lvlH, 12);
+          rRect(ctx, pillX, lvlPillY, pillW, pillH, 12);
+          ctx.strokeStyle = style.border;
+          ctx.lineWidth   = 2;
+          ctx.stroke();
+
+          // Count pill
+          rRect(ctx, pillX, cntPillY, pillW, pillH, 12);
+          ctx.fillStyle = "rgba(8,12,20,0.90)";
+          ctx.fill();
+          rRect(ctx, pillX, cntPillY, pillW, pillH, 12);
           ctx.strokeStyle = style.border;
           ctx.lineWidth   = 2;
           ctx.stroke();
           ctx.restore();
 
           ctx.fillStyle = style.stripText;
-          ctx.font      = "bold 42px 'Times New Roman'";
+          ctx.font      = PILL_FONT;
           ctx.textAlign = "center";
-          ctx.fillText(lvlText, lvlX + lvlW / 2, lvlY + lvlH - 12);
+          ctx.fillText(lvlText, pillX + pillW / 2, lvlPillY + pillH - 14);
+          ctx.fillText(cntText, pillX + pillW / 2, cntPillY + pillH - 14);
         }
 
-        // ---- Rank text in strip ----
-        ctx.fillStyle = style.stripText;
-        ctx.font      = "bold 40px 'Times New Roman'";
-        ctx.textAlign = "center";
-        const rankLabel = rank.length > 24 ? rank.substring(0, 22) + "…" : rank;
-        // Show member count only in the first box of the rank
-        const stripLabel = globalIdx === 0
-          ? `${rankLabel.toUpperCase()}  •  ${memberCount}`
-          : rankLabel.toUpperCase();
-        ctx.fillText(stripLabel, x + BOX_W / 2, y + STRIP_H - 20);
+        // ---- Rank title in strip — big and clear ----
+        ctx.save();
+        ctx.shadowColor = style.accent;
+        ctx.shadowBlur  = 14;
+        ctx.fillStyle   = style.stripText;
+        ctx.font        = "bold 56px 'Times New Roman'";
+        ctx.textAlign   = "center";
+        const rankLabel = rank.length > 22 ? rank.substring(0, 20) + "…" : rank;
+        ctx.fillText(rankLabel.toUpperCase(), x + BOX_W / 2, y + STRIP_H - 18);
+        ctx.restore();
 
         // ---- Member name ----
-        ctx.fillStyle = "#0a1a1e";
+        ctx.fillStyle = "#d4eef2";
         ctx.font      = "bold 58px 'Times New Roman'";
+        ctx.textAlign = "center";
         const nameText = member.name.length > 20 ? member.name.substring(0, 18) + "…" : member.name;
-        ctx.fillText(nameText, x + BOX_W / 2, y + STRIP_H + 82);
+        ctx.fillText(nameText, x + BOX_W / 2, y + STRIP_H + 88);
 
         // ---- Username ----
         ctx.font      = "italic 40px 'Times New Roman'";
-        ctx.fillStyle = "#2a5a65";
+        ctx.fillStyle = "#4a8c9a";
         const uText = `@${member.username}`;
         const uDisplay = uText.length > 24 ? uText.substring(0, 22) + "…" : uText;
-        ctx.fillText(uDisplay, x + BOX_W / 2, y + STRIP_H + 136);
+        ctx.fillText(uDisplay, x + BOX_W / 2, y + STRIP_H + 144);
       });
     }
 
